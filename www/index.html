@@ -9,6 +9,17 @@
 </head>
 <body>
 
+<!-- 위장 잠금 화면 -->
+<section id="gate" class="screen">
+  <div class="gate-box">
+    <div class="gate-icon">🔦</div>
+    <h1>랜턴을 켜시겠습니까?</h1>
+    <input id="gate-pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off">
+    <button id="gate-on" class="gate-btn">켜기</button>
+  </div>
+</section>
+<div id="light" class="light hidden"><p>화면을 누르면 꺼집니다</p></div>
+
 <!-- 로그인 -->
 <section id="login" class="screen hidden">
   <div class="login-box">

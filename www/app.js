@@ -122,10 +122,13 @@ let monthPhotos = [];
 let curTab = 'cal';
 
 /* ================= 화면 전환 ================= */
+let unlocked = false;
+const GATE_CODE = '0409';
 function show(id) {
-  ['#login', '#whoami', '#main'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
+  ['#gate', '#login', '#whoami', '#main'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
 }
 function start() {
+  if (!unlocked) { show('#gate'); return; }
   if (!session) { show('#login'); return; }
   if (!me) { show('#whoami'); return; }
   show('#main');
@@ -469,10 +472,24 @@ $$('.bottom button').forEach((b) => (b.onclick = () => switchTab(b.dataset.tab))
 $('#sheet-bg').onclick = closeSheet;
 $$('[data-close]').forEach((b) => (b.onclick = closeSheet));
 
-// 앱으로 다시 돌아왔을 때 새로고침
+// 위장 잠금: '랜턴을 켜시겠습니까?' 에 0409
+$('#gate-on').onclick = () => {
+  const v = $('#gate-pw').value.trim();
+  $('#gate-pw').value = '';
+  if (v === GATE_CODE) { unlocked = true; $('#gate-pw').blur(); start(); }
+  else $('#light').classList.remove('hidden'); // 틀리면 진짜 손전등처럼 화면만 하얗게
+};
+$('#gate-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#gate-on').click(); });
+$('#light').onclick = () => $('#light').classList.add('hidden');
+
+// 앱을 1분 넘게 나갔다 오면 다시 잠금, 돌아오면 새로고침
+let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && session && me && !$('#main').classList.contains('hidden')) switchTab(curTab);
-  else if (document.visibilityState === 'hidden') stopPoll();
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); stopPoll(); return; }
+  if (unlocked && hiddenAt && Date.now() - hiddenAt > 60 * 1000) {
+    unlocked = false; closeSheet(); closeViewer(); start(); return;
+  }
+  if (session && me && !$('#main').classList.contains('hidden')) switchTab(curTab);
 });
 
 // 안드로이드 뒤로가기 버튼
@@ -480,7 +497,8 @@ document.addEventListener('visibilitychange', () => {
   const App = window.Capacitor?.Plugins?.App;
   if (!App) return;
   App.addListener('backButton', () => {
-    if (!$('#viewer').classList.contains('hidden')) closeViewer();
+    if (!$('#light').classList.contains('hidden')) $('#light').classList.add('hidden');
+    else if (!$('#viewer').classList.contains('hidden')) closeViewer();
     else if (openSheetId) closeSheet();
     else if (!$('#main').classList.contains('hidden') && curTab !== 'cal') switchTab('cal');
     else App.exitApp();

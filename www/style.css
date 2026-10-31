@@ -34,6 +34,16 @@ textarea { resize: none; }
 .small { font-size: 13px; }
 .err { color: #d33; min-height: 1.2em; font-size: 14px; }
 
+/* 위장 잠금 화면 */
+#gate { background: #1b1f2e; color: #e8eaf2; justify-content: center; align-items: center; padding: 24px; z-index: 50; }
+.gate-box { width: 100%; max-width: 320px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.gate-icon { font-size: 72px; }
+.gate-box h1 { font-size: 22px; margin: 0; font-weight: 600; }
+#gate-pw { background: #262b3d; border: 1px solid #3a4058; color: #fff; text-align: center; font-size: 22px; letter-spacing: 8px; }
+.gate-btn { width: 100%; padding: 14px; border-radius: 14px; background: #ffd65a; color: #222; font-weight: 700; font-size: 17px; }
+.light { position: fixed; inset: 0; background: #fff; z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+.light p { color: #ccc; font-size: 13px; margin-bottom: 40px; }
+
 /* 로그인 */
 #login, #whoami { justify-content: center; align-items: center; padding: 24px; }
 .login-box { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
