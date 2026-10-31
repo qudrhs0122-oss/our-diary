@@ -123,7 +123,7 @@ let curTab = 'cal';
 
 /* ================= 화면 전환 ================= */
 let unlocked = false;
-const GATE_CODE = '0409';
+const GATE_CODE = '1204';
 function show(id) {
   ['#gate', '#login', '#whoami', '#main'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
 }
@@ -472,7 +472,7 @@ $$('.bottom button').forEach((b) => (b.onclick = () => switchTab(b.dataset.tab))
 $('#sheet-bg').onclick = closeSheet;
 $$('[data-close]').forEach((b) => (b.onclick = closeSheet));
 
-// 위장 잠금: '랜턴을 켜시겠습니까?' 에 0409
+// 위장 잠금: '랜턴을 켜시겠습니까?' 에 1204
 $('#gate-on').onclick = () => {
   const v = $('#gate-pw').value.trim();
   $('#gate-pw').value = '';
