@@ -44,7 +44,15 @@ textarea { resize: none; }
 .light { position: fixed; inset: 0; background: #fff; z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
 .light p { color: #ccc; font-size: 13px; margin-bottom: 40px; }
 
-/* 로그인 */
+/* 로그인 (백조의 방) */
+#login, #whoami { background: linear-gradient(to bottom, rgba(10,10,20,.15) 0%, rgba(10,10,20,.35) 45%, rgba(10,10,20,.8) 100%), url('img/login.jpg') center / cover no-repeat, #111; color: #fff; }
+#login .sub, #whoami .sub { color: rgba(255,255,255,.75); }
+#login input, #whoami input { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); color: #fff; backdrop-filter: blur(6px); }
+#login input::placeholder, #whoami input::placeholder { color: rgba(255,255,255,.6); }
+#login .err { color: #ffb3a8; }
+.room-title { font-size: 34px !important; letter-spacing: 6px; font-weight: 700; text-shadow: 0 2px 16px rgba(0,0,0,.6); margin-bottom: 4px !important; }
+#login { justify-content: flex-end !important; padding-bottom: 70px !important; }
+
 #login, #whoami { justify-content: center; align-items: center; padding: 24px; }
 .login-box { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 .logo { font-size: 56px; }
