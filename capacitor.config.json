@@ -1,0 +1,8 @@
+{
+  "appId": "com.ourdiary.app",
+  "appName": "우리 다이어리",
+  "webDir": "www",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}
