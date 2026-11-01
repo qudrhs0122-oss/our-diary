@@ -141,11 +141,12 @@ function logout() {
 function switchTab(t) {
   curTab = t;
   $$('.bottom button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
-  ['cal', 'notes', 'photos'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
-  $('#title').textContent = { cal: '캘린더', notes: '노트', photos: '사진' }[t];
+  ['cal', 'notes', 'chat', 'photos'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
+  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진' }[t];
   stopPoll();
   if (t === 'cal') loadMonth();
   if (t === 'notes') { loadNotes(true); poll = setInterval(() => loadNotes(false), 4000); }
+  if (t === 'chat') { loadTalk(true); poll = setInterval(() => loadTalk(false), 3000); }
   if (t === 'photos') loadAlbum();
 }
 let poll = null;
@@ -356,6 +357,47 @@ $('#chat').addEventListener('click', (e) => {
   const n = notes.find((x) => x.photo_path === img.dataset.path);
   openViewer({ path: n.photo_path, caption: n.body, author: n.author, when: `${prettyDate(ymd(new Date(n.created_at)))} ${hm(n.created_at)}`, canDelete: false });
 });
+
+/* ================= 채팅 (매일 자정 리셋) ================= */
+let talk = [];
+let talkSig = '';
+let talkDay = '';
+function midnightISO() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+
+async function loadTalk(scroll) {
+  try {
+    // 오늘 0시 이후 메시지만 (서버에서도 매일 자정에 삭제됨)
+    const rows = await db.select('chats', `select=*&created_at=gte.${encodeURIComponent(midnightISO())}&order=created_at.asc&limit=500`);
+    const list = rows || [];
+    const sig = ymd(new Date()) + list.map((n) => n.id).join(',');
+    if (sig === talkSig && !scroll) return;
+    const box = $('#talk');
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    talk = list; talkSig = sig;
+    renderTalk();
+    if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+  } catch (e) { if (scroll) handleErr(e); }
+}
+function renderTalk() {
+  $('#talk').innerHTML = talk.map((n) => {
+    const who = mine(n.author) ? 'me' : 'you';
+    return `<div class="msg ${who}" data-id="${n.id}">
+      ${who === 'you' ? `<div class="name">${esc(n.author)}</div>` : ''}
+      <div class="bubble">${esc(n.body)}</div>
+      <div class="time">${hm(n.created_at)}</div></div>`;
+  }).join('') || '<div class="empty">오늘의 대화를 시작해 보세요 💬</div>';
+}
+const talkText = $('#talk-text');
+talkText.addEventListener('input', () => { talkText.style.height = 'auto'; talkText.style.height = Math.min(talkText.scrollHeight, 120) + 'px'; });
+$('#talk-send').onclick = async () => {
+  const body = talkText.value.trim(); if (!body) return;
+  const btn = $('#talk-send'); btn.disabled = true;
+  try {
+    await db.insert('chats', { body, author: me });
+    talkText.value = ''; talkText.style.height = 'auto';
+    await loadTalk(true);
+  } catch (e) { handleErr(e); } finally { btn.disabled = false; }
+};
 
 /* ================= 사진 앨범 ================= */
 let album = [];

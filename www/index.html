@@ -88,6 +88,16 @@
     </div>
   </div>
 
+  <!-- 채팅 (매일 자정 삭제) -->
+  <div id="tab-chat" class="tab hidden">
+    <div class="chat-banner">🌙 오늘 대화는 자정(00:00)에 모두 사라져요</div>
+    <div id="talk" class="chat"></div>
+    <div class="chat-input">
+      <textarea id="talk-text" rows="1" placeholder="메시지 보내기"></textarea>
+      <button id="talk-send" class="btn primary small">보내기</button>
+    </div>
+  </div>
+
   <!-- 사진 -->
   <div id="tab-photos" class="tab hidden">
     <div id="album"></div>
@@ -97,7 +107,8 @@
 
   <nav class="bottom">
     <button data-tab="cal" class="active"><span>📅</span>캘린더</button>
-    <button data-tab="notes"><span>💬</span>노트</button>
+    <button data-tab="notes"><span>📝</span>노트</button>
+    <button data-tab="chat"><span>💬</span>채팅</button>
     <button data-tab="photos"><span>🖼️</span>사진</button>
   </nav>
 </section>
