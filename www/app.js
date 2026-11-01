@@ -143,13 +143,14 @@ function logout() {
 function switchTab(t) {
   curTab = t;
   $$('.bottom button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
-  ['cal', 'notes', 'chat', 'photos', 'bucket'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
-  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진', bucket: '버킷리스트' }[t];
+  ['cal', 'notes', 'chat', 'photos', 'map', 'bucket'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
+  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진', map: '지도', bucket: '버킷리스트' }[t];
   stopPoll();
   if (t === 'cal') { loadMonth(); tickDday(); renderDdayNext(); }
   if (t === 'notes') { loadNotes(true); poll = setInterval(() => loadNotes(false), 4000); }
   if (t === 'chat') { loadTalk(true).then(beat); poll = setInterval(() => { loadTalk(false); beat(); }, 3000); }
   if (t === 'photos') loadAlbum();
+  if (t === 'map') { initMap(); setTimeout(() => map && map.invalidateSize(), 50); loadPlaces(); }
   if (t === 'bucket') { loadBucket(); poll = setInterval(loadBucket, 8000); }
 }
 let poll = null;
@@ -377,6 +378,198 @@ $('#bucket').addEventListener('click', async (e) => {
     await loadBucket();
   } catch (err) { handleErr(err); loadBucket(); }
 });
+
+/* ================= 지도 ================= */
+let map = null;
+let placeLayer = null;
+let places = [];
+let picking = false;
+let draft = null;        // 새로 기록할 장소 { lat, lng, addr }
+let draftFiles = [];
+let viewingPlace = null;
+
+function initMap() {
+  if (map || !window.L) return;
+  const last = store.get('mapView', { lat: 37.5446, lng: 127.0560, z: 12 });
+  map = L.map('map', { zoomControl: false, attributionControl: true }).setView([last.lat, last.lng], last.z);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd',
+    attribution: '© OpenStreetMap © CARTO',
+  }).addTo(map);
+  placeLayer = L.layerGroup().addTo(map);
+  map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', { lat: c.lat, lng: c.lng, z: map.getZoom() }); });
+  map.on('contextmenu', (e) => { if (!picking) startDraft(e.latlng.lat, e.latlng.lng); }); // 길게 누르기
+  map.on('click', () => { $('#map-results').classList.add('hidden'); $('#place-list').classList.add('hidden'); });
+}
+
+async function loadPlaces() {
+  try {
+    places = (await db.select('places', 'select=*&order=date.desc,created_at.desc&limit=1000')) || [];
+    renderPlaces();
+  } catch (e) { handleErr(e); }
+}
+function pinIcon(p) {
+  const cls = mine(p.author) ? 'me' : 'you';
+  const n = (p.photos || []).length;
+  return L.divIcon({ className: '', iconSize: [34, 42], iconAnchor: [17, 40],
+    html: `<div class="pin ${cls}"><span>${n ? '📷' : '💗'}</span></div>` });
+}
+function renderPlaces() {
+  if (map) {
+    placeLayer.clearLayers();
+    for (const p of places) {
+      L.marker([p.lat, p.lng], { icon: pinIcon(p) }).addTo(placeLayer)
+        .bindTooltip(esc(p.name), { direction: 'top', offset: [0, -38] })
+        .on('click', () => openPlace(p.id));
+    }
+  }
+  $('#place-list').innerHTML = places.length
+    ? `<div class="pl-head">우리가 간 곳 ${places.length}곳</div>` + places.map((p) => `
+      <div class="pl-row" data-id="${p.id}">
+        <i class="dot ${mine(p.author) ? 'me' : 'you'}"></i>
+        <div class="pl-txt"><b>${esc(p.name)}</b><span>${p.date.replace(/-/g, '.')}${p.memo ? ' · ' + esc(p.memo.slice(0, 30)) : ''}</span></div>
+        <span>${(p.photos || []).length ? '📷 ' + p.photos.length : ''}</span>
+      </div>`).join('')
+    : '<div class="empty">아직 기록한 곳이 없어요.<br>＋ 버튼이나 지도를 길게 눌러 추가해요</div>';
+}
+$('#map-list-btn').onclick = (e) => { e.stopPropagation(); $('#map-results').classList.add('hidden'); $('#place-list').classList.toggle('hidden'); };
+$('#place-list').addEventListener('click', (e) => {
+  const r = e.target.closest('.pl-row'); if (!r) return;
+  const p = places.find((x) => x.id === r.dataset.id); if (!p) return;
+  $('#place-list').classList.add('hidden');
+  map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16));
+  openPlace(p.id);
+});
+
+// 검색 (OpenStreetMap)
+async function geo(url) {
+  const r = await fetch(url, { headers: { 'Accept-Language': 'ko' } });
+  if (!r.ok) throw new Error('검색 실패');
+  return r.json();
+}
+$('#map-q').addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  const q = $('#map-q').value.trim(); if (!q) return;
+  $('#map-q').blur();
+  const box = $('#map-results'); box.classList.remove('hidden'); box.innerHTML = '<div class="empty">찾는 중…</div>';
+  $('#place-list').classList.add('hidden');
+  try {
+    const c = map.getCenter();
+    const res = await geo(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=ko&countrycodes=kr&q=${encodeURIComponent(q)}&viewbox=${c.lng - 1},${c.lat + 1},${c.lng + 1},${c.lat - 1}`);
+    box.innerHTML = res.length ? res.map((r, i) => `<div class="res" data-i="${i}"><b>${esc(r.name || r.display_name.split(',')[0])}</b><span>${esc(r.display_name)}</span></div>`).join('')
+      : '<div class="empty">검색 결과가 없어요. 지도를 직접 움직여 핀을 꽂아도 돼요.</div>';
+    box.onclick = (ev) => {
+      const el = ev.target.closest('.res'); if (!el) return;
+      const r = res[+el.dataset.i];
+      box.classList.add('hidden');
+      map.setView([+r.lat, +r.lon], 17);
+      startDraft(+r.lat, +r.lon, r.name || r.display_name.split(',')[0], r.display_name);
+    };
+  } catch (err) { box.innerHTML = '<div class="empty">검색이 안 돼요. 인터넷 연결을 확인해 주세요.</div>'; }
+});
+
+// 내 위치
+$('#map-locate').onclick = () => {
+  if (!navigator.geolocation) { toast('위치를 사용할 수 없어요'); return; }
+  toast('내 위치 찾는 중…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      map.setView(ll, 17);
+      L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#3c8cf0', fillOpacity: 1 }).addTo(map);
+    },
+    () => toast('위치 권한을 허용해 주세요'),
+    { enableHighAccuracy: true, timeout: 15000 },
+  );
+};
+
+// 장소 추가: ＋ 누르면 가운데 핀으로 위치 고르기
+$('#map-add').onclick = () => {
+  picking = true;
+  ['#map-cross', '#map-pickbar'].forEach((x) => $(x).classList.remove('hidden'));
+  ['#map-add', '#map-locate'].forEach((x) => $(x).classList.add('hidden'));
+  $('#place-list').classList.add('hidden'); $('#map-results').classList.add('hidden');
+};
+function endPick() {
+  picking = false;
+  ['#map-cross', '#map-pickbar'].forEach((x) => $(x).classList.add('hidden'));
+  ['#map-add', '#map-locate'].forEach((x) => $(x).classList.remove('hidden'));
+}
+$('#pick-cancel').onclick = endPick;
+$('#pick-ok').onclick = () => { const c = map.getCenter(); endPick(); startDraft(c.lat, c.lng); };
+
+async function startDraft(lat, lng, name = '', addr = '') {
+  draft = { lat, lng }; draftFiles = [];
+  $('#pl-name').value = name; $('#pl-addr').textContent = addr;
+  $('#pl-date').value = today; $('#pl-memo').value = ''; $('#pl-previews').innerHTML = '';
+  openSheet('#sheet-place');
+  if (!name) {
+    try {
+      const r = await geo(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=ko&zoom=18&lat=${lat}&lon=${lng}`);
+      if (draft && draft.lat === lat) {
+        if (!$('#pl-name').value) $('#pl-name').value = r.name || (r.address && (r.address.amenity || r.address.shop || r.address.building || r.address.road || r.address.suburb)) || '';
+        $('#pl-addr').textContent = r.display_name || '';
+      }
+    } catch {}
+  }
+}
+function addDraftFiles(files) {
+  for (const f of files) draftFiles.push(f);
+  $('#pl-previews').innerHTML = draftFiles.map((f) => `<img src="${URL.createObjectURL(f)}" alt="">`).join('');
+}
+$('#pl-files').onchange = $('#pl-camera').onchange = (e) => { addDraftFiles(Array.from(e.target.files || [])); e.target.value = ''; };
+$('#pl-save').onclick = async () => {
+  const name = $('#pl-name').value.trim();
+  if (!name) { toast('장소 이름을 적어주세요'); return; }
+  busy(true);
+  try {
+    const photos = [];
+    for (const f of draftFiles) photos.push(await uploadPhoto(f));
+    await db.insert('places', { name, lat: draft.lat, lng: draft.lng, date: $('#pl-date').value || today, memo: $('#pl-memo').value.trim() || null, photos, author: me });
+    closeSheet(); draft = null; draftFiles = [];
+    toast('기록했어요 📍');
+    await loadPlaces();
+  } catch (e) { handleErr(e); } finally { busy(false); }
+};
+
+// 장소 보기
+function openPlace(id) {
+  const p = places.find((x) => x.id === id); if (!p) return;
+  viewingPlace = p;
+  $('#pv-name').textContent = p.name;
+  $('#pv-when').textContent = `${prettyDate(p.date)} · ${p.author}님이 기록`;
+  $('#pv-memo').textContent = p.memo || '';
+  $('#pv-del').classList.toggle('hidden', !mine(p.author));
+  renderThumbs($('#pv-photos'), (p.photos || []).map((path, i) => ({ id: `${p.id}-${i}`, path })));
+  openSheet('#sheet-place-view');
+}
+$('#pv-photos').addEventListener('click', (e) => {
+  const img = e.target.closest('img[data-pid]'); if (!img || !viewingPlace) return;
+  const i = +img.dataset.pid.split('-').pop();
+  openViewer({ path: viewingPlace.photos[i], caption: viewingPlace.name, author: viewingPlace.author, when: prettyDate(viewingPlace.date), canDelete: false });
+});
+$('#pv-files').onchange = $('#pv-camera').onchange = async (e) => {
+  const files = Array.from(e.target.files || []); e.target.value = '';
+  if (!files.length || !viewingPlace) return;
+  busy(true);
+  try {
+    const add = [];
+    for (const f of files) add.push(await uploadPhoto(f));
+    const photos = [...(viewingPlace.photos || []), ...add];
+    await db.update('places', viewingPlace.id, { photos });
+    const id = viewingPlace.id;
+    await loadPlaces(); openPlace(id); toast(`사진 ${add.length}장 추가`);
+  } catch (err) { handleErr(err); } finally { busy(false); }
+};
+$('#pv-del').onclick = async () => {
+  if (!viewingPlace || !confirm('이 장소 기록을 삭제할까요?')) return;
+  busy(true);
+  try {
+    await db.remove('places', viewingPlace.id);
+    if ((viewingPlace.photos || []).length) await storage.remove(viewingPlace.photos).catch(() => {});
+    closeSheet(); await loadPlaces(); toast('삭제했어요');
+  } catch (e) { handleErr(e); } finally { busy(false); }
+};
 
 /* ================= 노트(대화) ================= */
 let notes = [];
@@ -684,6 +877,8 @@ document.addEventListener('visibilitychange', () => {
     if (!$('#light').classList.contains('hidden')) $('#light').classList.add('hidden');
     else if (!$('#viewer').classList.contains('hidden')) closeViewer();
     else if (openSheetId) closeSheet();
+    else if (picking) endPick();
+    else if (curTab === 'map' && !$('#place-list').classList.contains('hidden')) $('#place-list').classList.add('hidden');
     else if (!$('#main').classList.contains('hidden') && curTab !== 'cal') switchTab('cal');
     else App.exitApp();
   });

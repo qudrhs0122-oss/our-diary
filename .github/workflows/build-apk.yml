@@ -41,6 +41,9 @@ jobs:
       - name: App icon + signing key
         run: |
           RES=android/app/src/main/res
+          # 지도 '내 위치'용 위치 권한
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -n "LOCATION" android/app/src/main/AndroidManifest.xml
           rm -rf $RES/mipmap-anydpi-v26
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp icons/$d.png $RES/mipmap-$d/ic_launcher.png
