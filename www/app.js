@@ -134,6 +134,7 @@ function start() {
   if (!me) { show('#whoami'); return; }
   show('#main');
   switchTab(curTab);
+  beat();
 }
 function logout() {
   session = null; store.del('session'); stopPoll(); show('#login');
@@ -147,7 +148,7 @@ function switchTab(t) {
   stopPoll();
   if (t === 'cal') { loadMonth(); tickDday(); renderDdayNext(); }
   if (t === 'notes') { loadNotes(true); poll = setInterval(() => loadNotes(false), 4000); }
-  if (t === 'chat') { loadTalk(true); poll = setInterval(() => loadTalk(false), 3000); }
+  if (t === 'chat') { loadTalk(true).then(beat); poll = setInterval(() => { loadTalk(false); beat(); }, 3000); }
   if (t === 'photos') loadAlbum();
   if (t === 'bucket') { loadBucket(); poll = setInterval(loadBucket, 8000); }
 }
@@ -481,9 +482,50 @@ function renderTalk() {
     return `<div class="msg ${who}" data-id="${n.id}">
       ${who === 'you' ? `<div class="name">${esc(n.author)}</div>` : ''}
       <div class="bubble">${esc(n.body)}</div>
-      <div class="time">${hm(n.created_at)}</div></div>`;
+      <div class="time">${who === 'me' ? readMark(n.created_at) : ''}${hm(n.created_at)}</div></div>`;
   }).join('') || '<div class="empty">오늘의 대화를 시작해 보세요 💬</div>';
 }
+
+/* ================= 접속 상태 · 읽음 표시 ================= */
+let peers = [];
+const other = () => peers.find((p) => p.name !== me) || null;
+function readMark(createdAt) {
+  const o = other();
+  return o && o.chat_seen_at && new Date(o.chat_seen_at) >= new Date(createdAt) ? '<span class="read">읽음</span> ' : '<span class="unread">1</span> ';
+}
+const inApp = () => document.visibilityState === 'visible' && unlocked && !!session && !!me && !$('#main').classList.contains('hidden');
+let beating = false;
+async function beat(leaving) {
+  if (!session || !me || beating) return;
+  const now = new Date().toISOString();
+  const row = { name: me, last_seen: now, active: !leaving && inApp() };
+  if (row.active && curTab === 'chat') row.chat_seen_at = now;
+  beating = true;
+  try {
+    await sb('/rest/v1/presence?on_conflict=name', { method: 'POST', json: row, headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    if (leaving) return;
+    const prevSeen = other()?.chat_seen_at;
+    peers = (await db.select('presence', 'select=*&order=last_seen.desc')) || [];
+    renderPresence();
+    if (curTab === 'chat' && other()?.chat_seen_at !== prevSeen) renderTalk();
+  } catch (e) { /* 접속 표시는 실패해도 조용히 넘어감 */ } finally { beating = false; }
+}
+function ago(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return '방금 전';
+  if (s < 3600) return `${Math.floor(s / 60)}분 전`;
+  if (s < 86400) return `${Math.floor(s / 3600)}시간 전`;
+  return `${Math.floor(s / 86400)}일 전`;
+}
+function renderPresence() {
+  const o = other(); const el = $('#presence');
+  if (!o) { el.innerHTML = ''; return; }
+  const online = o.active && Date.now() - new Date(o.last_seen) < 30000;
+  el.innerHTML = online
+    ? `<i class="on"></i>${esc(o.name)} 접속 중`
+    : `<i class="off"></i>${esc(o.name)} · ${ago(o.last_seen)}`;
+}
+setInterval(() => { if (inApp() && curTab !== 'chat') beat(); }, 10000);
 const talkText = $('#talk-text');
 talkText.addEventListener('input', () => { talkText.style.height = 'auto'; talkText.style.height = Math.min(talkText.scrollHeight, 120) + 'px'; });
 $('#talk-send').onclick = async () => {
@@ -603,7 +645,10 @@ $('#me-save').onclick = () => {
 $('#settings-btn').onclick = () => { $('#set-name').value = me; openSheet('#sheet-settings'); };
 $('#set-save').onclick = () => {
   const n = $('#set-name').value.trim(); if (!n) return;
+  const old = me;
   me = n; store.set('me', me); closeSheet(); toast('이름을 바꿨어요'); switchTab(curTab);
+  if (old && old !== n) sb(`/rest/v1/presence?name=eq.${encodeURIComponent(old)}`, { method: 'DELETE' }).catch(() => {});
+  beat();
 };
 $('#set-logout').onclick = () => { if (confirm('로그아웃할까요?')) { closeSheet(); logout(); } };
 
@@ -624,11 +669,11 @@ $('#light').onclick = () => $('#light').classList.add('hidden');
 // 앱을 1분 넘게 나갔다 오면 다시 잠금, 돌아오면 새로고침
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); stopPoll(); return; }
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); stopPoll(); beat(true); return; }
   if (unlocked && hiddenAt && Date.now() - hiddenAt > 60 * 1000) {
     unlocked = false; closeSheet(); closeViewer(); start(); return;
   }
-  if (session && me && !$('#main').classList.contains('hidden')) switchTab(curTab);
+  if (session && me && !$('#main').classList.contains('hidden')) { switchTab(curTab); beat(); }
 });
 
 // 안드로이드 뒤로가기 버튼

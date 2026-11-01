@@ -196,3 +196,11 @@ textarea { resize: none; }
 .bk.done .bk-title { text-decoration: line-through; color: var(--muted); }
 .bk-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .bk-del { color: #c9b9b5; font-size: 16px; padding: 4px 6px; }
+
+/* 접속 상태 · 읽음 */
+.presence { margin-left: auto; margin-right: 6px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.presence i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.presence i.on { background: #3cc47c; box-shadow: 0 0 0 3px rgba(60, 196, 124, .2); }
+.presence i.off { background: #c9bdb9; }
+.unread { color: #f5a623; font-weight: 800; font-size: 12px; }
+.read { color: var(--muted); font-size: 11px; }
