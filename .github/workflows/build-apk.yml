@@ -50,17 +50,17 @@ jobs:
           # 항상 같은 서명키로 서명 (업데이트 설치가 되도록)
           cat >> android/app/build.gradle <<'GRADLE'
 
-android {
-    signingConfigs {
-        debug {
+          android {
+              signingConfigs {
+                  debug {
             storeFile file("${rootDir}/../signing/debug.keystore")
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'
-        }
-    }
-}
-GRADLE
+                  }
+              }
+          }
+          GRADLE
 
       - name: Build APK
         run: |
