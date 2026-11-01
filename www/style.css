@@ -157,3 +157,7 @@ textarea { resize: none; }
 .busy { position: fixed; inset: 0; background: rgba(255, 255, 255, .5); z-index: 40; display: flex; align-items: center; justify-content: center; }
 .spinner { width: 36px; height: 36px; border: 4px solid var(--me-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.fab-cam { bottom: calc(150px + var(--bot)) !important; width: 50px; height: 50px; right: 22px; font-size: 22px;
+  background: #fff; color: var(--ink); box-shadow: 0 4px 14px rgba(120, 70, 60, .25); }
+.attach { padding: 6px 4px; }

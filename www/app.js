@@ -319,7 +319,7 @@ function renderNotes() {
 
 const chatText = $('#chat-text');
 chatText.addEventListener('input', () => { chatText.style.height = 'auto'; chatText.style.height = Math.min(chatText.scrollHeight, 120) + 'px'; });
-$('#chat-file').onchange = (e) => {
+$('#chat-file').onchange = $('#chat-camera').onchange = (e) => {
   chatFile = e.target.files[0] || null; e.target.value = '';
   if (chatFile) { $('#chat-preview-img').src = URL.createObjectURL(chatFile); $('#chat-preview').classList.remove('hidden'); }
 };
@@ -366,7 +366,7 @@ async function loadAlbum() {
   } catch (e) { handleErr(e); }
 }
 function renderAlbum() {
-  if (!album.length) { $('#album').innerHTML = '<div class="empty" style="padding-top:60px">＋ 버튼으로 첫 사진을 올려보세요 📸</div>'; return; }
+  if (!album.length) { $('#album').innerHTML = '<div class="empty" style="padding-top:60px">📷 버튼으로 찍거나 ＋ 버튼으로 골라서 올려보세요</div>'; return; }
   let html = ''; let lastM = ''; let lastD = ''; let open = false;
   for (const p of album) {
     const mth = p.date.slice(0, 7);
@@ -384,7 +384,7 @@ function renderAlbum() {
 }
 
 let pendingFiles = [];
-$('#photo-file').onchange = $('#day-photo-file').onchange = (e) => {
+$('#photo-file').onchange = $('#day-photo-file').onchange = $('#photo-camera').onchange = $('#day-camera').onchange = (e) => {
   pendingFiles = Array.from(e.target.files || []); e.target.value = '';
   if (!pendingFiles.length) return;
   $('#ph-previews').innerHTML = pendingFiles.map((f) => `<img src="${URL.createObjectURL(f)}" alt="">`).join('');
