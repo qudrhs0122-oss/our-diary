@@ -389,14 +389,31 @@ let draft = null;        // 새로 기록할 장소 { lat, lng, addr }
 let draftFiles = [];
 let viewingPlace = null;
 
+// 키가 필요 없는 지도들 (앞에서부터 시도, 안 되면 다음 것으로 자동 전환)
+const TILE_SOURCES = [
+  { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opt: { maxZoom: 19, attribution: '© OpenStreetMap' } },
+  { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', opt: { maxZoom: 19, attribution: '© Esri' } },
+  { url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', opt: { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap France' } },
+];
+let tileLayer = null;
+function useTiles(idx, tries = 0) {
+  idx = ((idx % TILE_SOURCES.length) + TILE_SOURCES.length) % TILE_SOURCES.length;
+  if (tileLayer) map.removeLayer(tileLayer);
+  const src = TILE_SOURCES[idx];
+  let ok = 0, bad = 0, switched = false;
+  tileLayer = L.tileLayer(src.url, src.opt).addTo(map);
+  store.set('tileIdx', idx);
+  tileLayer.on('tileload', () => { ok++; });
+  tileLayer.on('tileerror', () => {
+    bad++;
+    if (!switched && ok === 0 && bad >= 3 && tries < TILE_SOURCES.length - 1) { switched = true; useTiles(idx + 1, tries + 1); }
+  });
+}
 function initMap() {
   if (map || !window.L) return;
   const last = store.get('mapView', { lat: 37.5446, lng: 127.0560, z: 12 });
   map = L.map('map', { zoomControl: false, attributionControl: true }).setView([last.lat, last.lng], last.z);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd',
-    attribution: '© OpenStreetMap © CARTO',
-  }).addTo(map);
+  useTiles(store.get('tileIdx', 0));
   placeLayer = L.layerGroup().addTo(map);
   map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', { lat: c.lat, lng: c.lng, z: map.getZoom() }); });
   map.on('contextmenu', (e) => { if (!picking) startDraft(e.latlng.lat, e.latlng.lng); }); // 길게 누르기
@@ -433,6 +450,7 @@ function renderPlaces() {
       </div>`).join('')
     : '<div class="empty">아직 기록한 곳이 없어요.<br>＋ 버튼이나 지도를 길게 눌러 추가해요</div>';
 }
+$('#map-style-btn').onclick = (e) => { e.stopPropagation(); useTiles(store.get('tileIdx', 0) + 1); toast(`지도 ${store.get('tileIdx', 0) + 1}번으로 바꿨어요`); };
 $('#map-list-btn').onclick = (e) => { e.stopPropagation(); $('#map-results').classList.add('hidden'); $('#place-list').classList.toggle('hidden'); };
 $('#place-list').addEventListener('click', (e) => {
   const r = e.target.closest('.pl-row'); if (!r) return;
@@ -573,33 +591,24 @@ $('#pv-del').onclick = async () => {
 };
 
 /* ================= 하트 ================= */
-let mySide = store.get('side', '');
-let hearts = [];      // [{ name, side, count }]
-let pendingTaps = 0;
+// 왼쪽(m)·오른쪽(f) 하트를 누른 횟수가 각각 쌓임. 누구든 둘 다 누를 수 있음
+let hearts = [];      // [{ name: 'm'|'f', count }]
+const pending = { m: 0, f: 0 };
 let flushing = false;
 
-function openHeart() {
-  if (!mySide) openSheet('#sheet-side');
-  loadHearts();
-}
+function openHeart() { loadHearts(); }
 async function loadHearts() {
-  try { hearts = (await db.select('hearts', 'select=*')) || []; renderHearts(); } catch (e) { handleErr(e); stopPoll(); }
+  try { hearts = (await db.select('hearts', 'select=*&name=in.(m,f)')) || []; renderHearts(); } catch (e) { handleErr(e); stopPoll(); }
 }
 function renderHearts() {
-  const bySide = { m: null, f: null };
-  for (const h of hearts) if (h.side && (!bySide[h.side] || h.name === me)) bySide[h.side] = h;
   let total = 0;
-  for (const h of hearts) total += Number(h.count) || 0;
-  total += pendingTaps;
   for (const side of ['m', 'f']) {
-    const h = bySide[side];
-    let n = h ? Number(h.count) || 0 : 0;
-    if (side === mySide) n += pendingTaps;
+    const h = hearts.find((x) => x.name === side);
+    const n = (h ? Number(h.count) || 0 : 0) + pending[side];
+    total += n;
     $(`#ht-${side}`).textContent = n.toLocaleString();
-    $(`#ht-${side}-name`).textContent = side === mySide ? me : (h ? h.name : (side === 'm' ? '남자' : '여자'));
   }
   $('#ht-total').textContent = total.toLocaleString();
-  $$('.side').forEach((el) => el.classList.toggle('mine', el.dataset.side === mySide));
 }
 function buzz() {
   const H = window.Capacitor?.Plugins?.Haptics;
@@ -614,36 +623,31 @@ function floatHeart(x, y) {
   setTimeout(() => el.remove(), 1200);
 }
 async function flushTaps() {
-  if (flushing || !pendingTaps || !mySide) return;
+  if (flushing || (!pending.m && !pending.f)) return;
   flushing = true;
-  const n = pendingTaps;
   try {
-    await sb('/rest/v1/rpc/add_hearts', { method: 'POST', json: { p_name: me, p_side: mySide, p_n: n } });
-    pendingTaps -= n;
+    for (const side of ['m', 'f']) {
+      const n = pending[side]; if (!n) continue;
+      await sb('/rest/v1/rpc/add_hearts', { method: 'POST', json: { p_name: side, p_side: side, p_n: n } });
+      pending[side] -= n;
+    }
     await loadHearts();
   } catch (e) { handleErr(e); } finally { flushing = false; }
 }
 setInterval(flushTaps, 1200);
 $$('.figure').forEach((fig) => {
-  fig.addEventListener('click', (e) => {
-    if (!mySide) { openSheet('#sheet-side'); return; }
+  fig.addEventListener('click', () => {
+    const side = fig.dataset.side;
     const heart = fig.querySelector('.heart');
     const r = heart.getBoundingClientRect();
     const box = $('#tab-heart').getBoundingClientRect();
     buzz();
-    pendingTaps++;
+    pending[side]++;
     heart.classList.remove('beat'); void heart.getBoundingClientRect(); heart.classList.add('beat');
     floatHeart(r.left - box.left + r.width / 2 - 12, r.top - box.top + $('#tab-heart').scrollTop);
     renderHearts();
   });
 });
-$$('.side-pick').forEach((b) => (b.onclick = async () => {
-  await flushTaps();
-  mySide = b.dataset.side; store.set('side', mySide); closeSheet();
-  toast(mySide === 'm' ? '왼쪽(남자)으로 정했어요' : '오른쪽(여자)으로 정했어요');
-  try { await sb('/rest/v1/rpc/add_hearts', { method: 'POST', json: { p_name: me, p_side: mySide, p_n: 0 } }); } catch {}
-  if (curTab === 'heart') loadHearts();
-}));
 
 /* ================= 노트(대화) ================= */
 let notes = [];

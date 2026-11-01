@@ -112,6 +112,7 @@
     <div class="map-search">
       <input id="map-q" type="search" placeholder="장소 검색 (예: 성수동 카페)">
       <button id="map-list-btn" class="map-chip">목록</button>
+      <button id="map-style-btn" class="map-chip" aria-label="지도 바꾸기">🗺️</button>
     </div>
     <div id="map-results" class="map-results hidden"></div>
     <div id="map-cross" class="map-cross hidden">📍</div>
@@ -129,7 +130,7 @@
     <div class="heart-total">우리 하트 <b id="ht-total">0</b>번</div>
     <div class="couple">
       <div class="side" data-side="m">
-        <div class="count"><b id="ht-m">0</b><span id="ht-m-name">남자</span></div>
+        <div class="count"><b id="ht-m">0</b></div>
         <button class="figure" data-side="m" aria-label="남자 하트">
           <svg viewBox="0 0 160 300" class="person">
           <rect x="22" y="128" width="20" height="92" rx="10" fill="#f2c8a8"/>
@@ -150,7 +151,7 @@
         </button>
       </div>
       <div class="side" data-side="f">
-        <div class="count"><b id="ht-f">0</b><span id="ht-f-name">여자</span></div>
+        <div class="count"><b id="ht-f">0</b></div>
         <button class="figure" data-side="f" aria-label="여자 하트">
           <svg viewBox="0 0 160 300" class="person">
           <path d="M38,40 C30,90 34,130 46,150 L114,150 C126,130 130,90 122,40 Z" fill="#5a3a30"/>
@@ -278,25 +279,12 @@
   </div>
 </div>
 
-<div id="sheet-side" class="sheet hidden">
-  <h3>나는 어느 쪽인가요?</h3>
-  <p class="muted small">한 번만 정하면 돼요. 나중에 설정(⚙️)에서 바꿀 수 있어요.</p>
-  <div class="row">
-    <button class="btn side-pick" data-side="m">👦 왼쪽 (남자)</button>
-    <button class="btn side-pick" data-side="f">👧 오른쪽 (여자)</button>
-  </div>
-</div>
 
 <div id="sheet-settings" class="sheet hidden">
   <h3>설정</h3>
   <label class="muted small">내 이름</label>
   <input id="set-name" type="text" maxlength="10">
   <button id="set-save" class="btn primary">이름 저장</button>
-  <label class="muted small">하트 페이지에서 나는</label>
-  <div class="row">
-    <button class="btn side-pick" data-side="m">👦 왼쪽 (남자)</button>
-    <button class="btn side-pick" data-side="f">👧 오른쪽 (여자)</button>
-  </div>
   <button id="set-logout" class="btn">로그아웃</button>
   <button class="btn" data-close>닫기</button>
 </div>
