@@ -164,3 +164,35 @@ textarea { resize: none; }
 
 #tab-chat { display: flex; flex-direction: column; overflow: hidden; }
 .chat-banner { text-align: center; font-size: 12px; color: var(--muted); background: #f3e9e5; padding: 6px; }
+
+/* D-Day */
+.dday { margin: 2px 12px 10px; padding: 14px 16px; border-radius: 18px; color: #fff;
+  background: linear-gradient(135deg, #ff8a7a, #ff6f91); box-shadow: 0 4px 16px rgba(255, 111, 145, .3); }
+.dday-top { display: flex; justify-content: space-between; align-items: center; font-size: 14px; opacity: .95; }
+.dday-d { font-size: 22px; font-weight: 800; }
+.dday-time { font-size: 15px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.dday-time b { font-size: 22px; }
+.dday-next { font-size: 12px; margin-top: 6px; opacity: .9; }
+.dday-list { margin-top: 10px; background: rgba(255,255,255,.18); border-radius: 12px; padding: 8px 12px; font-size: 13px; }
+.dday-row { display: flex; justify-content: space-between; padding: 4px 0; }
+.dday-row span:first-child { font-weight: 700; min-width: 60px; }
+.dday-start { opacity: .85; padding-bottom: 4px; }
+.anniv { font-size: 9px; color: #ff6f91; font-weight: 700; line-height: 1; margin-top: 1px; white-space: nowrap; }
+
+/* 버킷리스트 */
+.bucket-add { display: flex; gap: 8px; padding: 4px 12px 8px; }
+.bucket-filter { display: flex; gap: 6px; align-items: center; padding: 0 12px 8px; }
+.bucket-filter button { font-size: 13px; padding: 6px 12px; border-radius: 16px; background: #f3ebe8; color: var(--muted); }
+.bucket-filter button.on { background: var(--ink); color: #fff; }
+#bk-progress { margin-left: auto; font-size: 12px; color: var(--muted); }
+#bucket { padding: 0 12px 24px; }
+.bk { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 14px; padding: 12px; margin-bottom: 8px;
+  border-left: 4px solid var(--you); }
+.bk.me { border-left-color: var(--me); }
+.bk-check { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 2px solid #d9ccc8; font-weight: 800; color: #fff; }
+.bk.done .bk-check { background: #4cc38a; border-color: #4cc38a; }
+.bk-body { flex: 1; min-width: 0; }
+.bk-title { font-weight: 600; word-break: break-word; }
+.bk.done .bk-title { text-decoration: line-through; color: var(--muted); }
+.bk-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bk-del { color: #c9b9b5; font-size: 16px; padding: 4px 6px; }

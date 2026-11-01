@@ -52,6 +52,12 @@
 
   <!-- 캘린더 -->
   <div id="tab-cal" class="tab">
+    <div id="dday" class="dday">
+      <div class="dday-top"><span>💗 함께한 시간</span><span id="dday-count" class="dday-d"></span></div>
+      <div id="dday-time" class="dday-time"></div>
+      <div id="dday-next" class="dday-next"></div>
+      <div id="dday-list" class="dday-list hidden"></div>
+    </div>
     <div class="cal-head">
       <button id="cal-prev" class="icon-btn">‹</button>
       <div id="cal-month"></div>
@@ -98,6 +104,21 @@
     </div>
   </div>
 
+  <!-- 버킷리스트 -->
+  <div id="tab-bucket" class="tab hidden">
+    <div class="bucket-add">
+      <input id="bk-text" type="text" maxlength="80" placeholder="함께 하고 싶은 것 적기">
+      <button id="bk-add" class="btn primary small">추가</button>
+    </div>
+    <div class="bucket-filter">
+      <button data-f="todo" class="on">하고 싶은 것</button>
+      <button data-f="done">이룬 것</button>
+      <button data-f="all">전체</button>
+      <span id="bk-progress"></span>
+    </div>
+    <div id="bucket"></div>
+  </div>
+
   <!-- 사진 -->
   <div id="tab-photos" class="tab hidden">
     <div id="album"></div>
@@ -110,6 +131,7 @@
     <button data-tab="notes"><span>📝</span>노트</button>
     <button data-tab="chat"><span>💬</span>채팅</button>
     <button data-tab="photos"><span>🖼️</span>사진</button>
+    <button data-tab="bucket"><span>✅</span>버킷</button>
   </nav>
 </section>
 

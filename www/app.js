@@ -66,6 +66,7 @@ const db = {
   select: (table, query) => sb(`/rest/v1/${table}?${query}`),
   insert: (table, row) => sb(`/rest/v1/${table}`, { method: 'POST', json: row, headers: { Prefer: 'return=representation' } }),
   remove: (table, id) => sb(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  update: (table, id, row) => sb(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', json: row, headers: { Prefer: 'return=representation' } }),
 };
 const storage = {
   upload: (path, blob) => sb(`/storage/v1/object/photos/${path}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } }),
@@ -141,13 +142,14 @@ function logout() {
 function switchTab(t) {
   curTab = t;
   $$('.bottom button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
-  ['cal', 'notes', 'chat', 'photos'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
-  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진' }[t];
+  ['cal', 'notes', 'chat', 'photos', 'bucket'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
+  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진', bucket: '버킷리스트' }[t];
   stopPoll();
-  if (t === 'cal') loadMonth();
+  if (t === 'cal') { loadMonth(); tickDday(); renderDdayNext(); }
   if (t === 'notes') { loadNotes(true); poll = setInterval(() => loadNotes(false), 4000); }
   if (t === 'chat') { loadTalk(true); poll = setInterval(() => loadTalk(false), 3000); }
   if (t === 'photos') loadAlbum();
+  if (t === 'bucket') { loadBucket(); poll = setInterval(loadBucket, 8000); }
 }
 let poll = null;
 function stopPoll() { if (poll) clearInterval(poll); poll = null; }
@@ -200,7 +202,9 @@ function renderCal() {
     if (i === 35 && other) break; // 5주로 충분하면 6번째 줄 생략
     const evs = other ? [] : (byDate[s] || []);
     const cls = ['cal-day', other && 'other', d.getDay() === 0 && 'sun', d.getDay() === 6 && 'sat', s === today && 'today', s === selDate && 'sel'].filter(Boolean).join(' ');
+    const an = other ? null : anniv(s);
     html += `<button class="${cls}" data-date="${s}"><span class="num">${d.getDate()}</span>
+      ${an ? `<span class="anniv">${an}</span>` : ''}
       <span class="dots">${evs.slice(0, 4).map((e) => `<i class="dot ${mine(e.author) ? 'me' : 'you'}"></i>`).join('')}</span>
       ${!other && photoDates.has(s) ? '<span class="cam">📷</span>' : ''}</button>`;
   }
@@ -209,7 +213,8 @@ function renderCal() {
 }
 
 function renderDay() {
-  $('#day-title').textContent = prettyDate(selDate);
+  const an = anniv(selDate);
+  $('#day-title').textContent = prettyDate(selDate) + (an ? ` 💗 ${an}` : '');
   const evs = monthEvents.filter((e) => e.date === selDate);
   const phs = monthPhotos.filter((p) => p.date === selDate);
   $('#day-events').innerHTML = evs.length ? evs.map((e) => `
@@ -279,6 +284,98 @@ $('#evv-del').onclick = async () => {
   try { await db.remove('events', viewingEvent.id); closeSheet(); await loadMonth(); toast('삭제했어요'); }
   catch (e) { handleErr(e); } finally { busy(false); }
 };
+
+/* ================= D-Day ================= */
+const START = new Date(2024, 11, 4, 0, 0, 0); // 2024년 12월 4일 0시 (처음 만난 날)
+const DAY = 86400000;
+const dayNo = (s) => Math.round((new Date(s + 'T00:00:00') - START) / DAY) + 1; // 시작일 = 1일
+function anniv(s) {
+  const n = dayNo(s);
+  if (n < 2) return n === 1 ? '시작' : null;
+  if (n % 100 === 0) return `${n}일`;
+  if (s.slice(5) === ymd(START).slice(5)) return `${Number(s.slice(0, 4)) - START.getFullYear()}주년`;
+  return null;
+}
+function upcoming(count) {
+  const out = []; const now = new Date(); now.setHours(0, 0, 0, 0);
+  const d = new Date(now);
+  for (let i = 0; i < 3650 && out.length < count; i++, d.setDate(d.getDate() + 1)) {
+    const s = ymd(d); const a = anniv(s);
+    if (a && a !== '시작') out.push({ s, a, left: Math.round((d - now) / DAY) });
+  }
+  return out;
+}
+function tickDday() {
+  if (curTab !== 'cal' || $('#main').classList.contains('hidden')) return;
+  let ms = Date.now() - START.getTime();
+  const days = Math.floor(ms / DAY); ms -= days * DAY;
+  const h = Math.floor(ms / 3600000); ms -= h * 3600000;
+  const m = Math.floor(ms / 60000); ms -= m * 60000;
+  const sec = Math.floor(ms / 1000);
+  $('#dday-count').textContent = `D+${dayNo(ymd(new Date()))}`;
+  $('#dday-time').innerHTML = `<b>${days.toLocaleString()}</b>일 <b>${pad(h)}</b>시간 <b>${pad(m)}</b>분 <b>${pad(sec)}</b>초`;
+}
+function renderDdayNext() {
+  const up = upcoming(8);
+  if (!up.length) return;
+  const n = up[0];
+  $('#dday-next').textContent = `다음 기념일 · ${n.a} (${prettyDate(n.s)}) ${n.left === 0 ? '오늘! 🎉' : `D-${n.left}`}`;
+  $('#dday-list').innerHTML = `<div class="dday-start">시작한 날 · 2024년 12월 4일</div>` +
+    up.map((u) => `<div class="dday-row"><span>${u.a}</span><span>${u.s.replace(/-/g, '.')}</span><span>${u.left === 0 ? '오늘' : `D-${u.left}`}</span></div>`).join('');
+}
+setInterval(tickDday, 1000);
+$('#dday').onclick = () => $('#dday-list').classList.toggle('hidden');
+
+/* ================= 버킷리스트 ================= */
+let buckets = [];
+let bkFilter = 'todo';
+async function loadBucket() {
+  try {
+    buckets = (await db.select('buckets', 'select=*&order=created_at.asc&limit=1000')) || [];
+    renderBucket();
+  } catch (e) { handleErr(e); stopPoll(); }
+}
+function renderBucket() {
+  const done = buckets.filter((b) => b.done).length;
+  $('#bk-progress').textContent = `${done}/${buckets.length} 완료`;
+  const list = buckets.filter((b) => bkFilter === 'all' || (bkFilter === 'done' ? b.done : !b.done));
+  if (bkFilter === 'done') list.sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)));
+  $('#bucket').innerHTML = list.map((b) => `
+    <div class="bk ${b.done ? 'done' : ''} ${mine(b.author) ? 'me' : 'you'}" data-id="${b.id}">
+      <button class="bk-check" aria-label="체크">${b.done ? '✓' : ''}</button>
+      <div class="bk-body">
+        <div class="bk-title">${esc(b.title)}</div>
+        <div class="bk-meta">${esc(b.author)}의 버킷${b.done ? ` · ✅ ${esc(b.done_by)}가 체크 (${b.done_at ? b.done_at.slice(0, 10).replace(/-/g, '.') : ''})` : ''}</div>
+      </div>
+      ${mine(b.author) ? '<button class="bk-del" aria-label="삭제">✕</button>' : ''}
+    </div>`).join('') || `<div class="empty" style="padding-top:40px">${bkFilter === 'done' ? '아직 이룬 게 없어요. 하나씩 해봐요!' : '함께 하고 싶은 걸 적어보세요 ✨'}</div>`;
+}
+$('#bk-add').onclick = async () => {
+  const title = $('#bk-text').value.trim(); if (!title) return;
+  const btn = $('#bk-add'); btn.disabled = true;
+  try { await db.insert('buckets', { title, author: me }); $('#bk-text').value = ''; if (bkFilter === 'done') setBkFilter('todo'); await loadBucket(); }
+  catch (e) { handleErr(e); } finally { btn.disabled = false; }
+};
+$('#bk-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#bk-add').click(); });
+function setBkFilter(f) { bkFilter = f; $$('.bucket-filter button').forEach((b) => b.classList.toggle('on', b.dataset.f === f)); renderBucket(); }
+$$('.bucket-filter button').forEach((b) => (b.onclick = () => setBkFilter(b.dataset.f)));
+$('#bucket').addEventListener('click', async (e) => {
+  const row = e.target.closest('.bk'); if (!row) return;
+  const b = buckets.find((x) => x.id === row.dataset.id); if (!b) return;
+  try {
+    if (e.target.closest('.bk-del')) {
+      if (!confirm('이 버킷을 지울까요?')) return;
+      await db.remove('buckets', b.id);
+    } else if (e.target.closest('.bk-check')) {
+      if (b.done && !confirm('체크를 풀까요?')) return;
+      Object.assign(b, b.done ? { done: false, done_by: null, done_at: null } : { done: true, done_by: me, done_at: new Date().toISOString() });
+      renderBucket();
+      await db.update('buckets', b.id, { done: b.done, done_by: b.done_by, done_at: b.done_at });
+      if (b.done) toast('🎉 버킷 하나 달성!');
+    } else return;
+    await loadBucket();
+  } catch (err) { handleErr(err); loadBucket(); }
+});
 
 /* ================= 노트(대화) ================= */
 let notes = [];
