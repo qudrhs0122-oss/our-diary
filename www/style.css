@@ -235,3 +235,30 @@ textarea { resize: none; }
 .pin.you { background: var(--you); }
 .leaflet-control-attribution { font-size: 9px; }
 .sheet .row .btn.small { flex: none; }
+
+/* 하트 */
+#tab-heart { background: linear-gradient(to bottom, #fff7f3, #ffe9ee); overflow: hidden; }
+.heart-total { text-align: center; color: var(--muted); font-size: 14px; margin-top: 6px; }
+.heart-total b { color: #ff5f86; font-size: 18px; }
+.couple { display: flex; justify-content: center; align-items: flex-end; gap: 0; padding: 4px 8px 0; }
+.side { flex: 1; display: flex; flex-direction: column; align-items: center; max-width: 200px; }
+.count { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; min-height: 58px; }
+.count b { font-size: 32px; font-weight: 800; color: #ff5f86; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.side[data-side="m"] .count b { color: #4a86d8; }
+.count span { font-size: 13px; color: var(--muted); }
+.side.mine .count span::after { content: ' (나)'; }
+.figure { padding: 0; width: 100%; }
+.person { width: 100%; height: auto; max-height: 52vh; display: block; }
+.heart path { fill: #ff4f7b; stroke: #fff; stroke-width: 1.4; }
+.side[data-side="m"] .heart path { fill: #ff5a7e; }
+.heart { transform-box: fill-box; transform-origin: center; animation: idle 1.6s ease-in-out infinite; }
+.heart.beat { animation: beat .35s ease-out; }
+@keyframes idle { 0%, 100% { transform: translate(80px,150px) scale(1); } 50% { transform: translate(80px,150px) scale(1.08); } }
+@keyframes beat { 0% { transform: translate(80px,150px) scale(1); } 40% { transform: translate(80px,150px) scale(1.45); } 100% { transform: translate(80px,150px) scale(1); } }
+.heart-hint { text-align: center; color: var(--muted); font-size: 13px; margin: 10px 0; }
+#floaters { position: absolute; inset: 0; pointer-events: none; }
+.floater { position: absolute; font-size: 24px; animation: floatup 1.2s ease-out forwards; }
+@keyframes floatup { from { transform: translateY(0) scale(.8); opacity: 1; } to { transform: translateY(-160px) scale(1.4); opacity: 0; } }
+.bottom button { font-size: 11px; }
+.bottom button span { font-size: 20px; }
+#tab-heart:not(.hidden) { display: flex; flex-direction: column; justify-content: center; padding-bottom: 20px; }

@@ -143,14 +143,15 @@ function logout() {
 function switchTab(t) {
   curTab = t;
   $$('.bottom button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
-  ['cal', 'notes', 'chat', 'photos', 'map', 'bucket'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
-  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진', map: '지도', bucket: '버킷리스트' }[t];
+  ['cal', 'notes', 'chat', 'photos', 'map', 'bucket', 'heart'].forEach((x) => $(`#tab-${x}`).classList.toggle('hidden', x !== t));
+  $('#title').textContent = { cal: '캘린더', notes: '노트', chat: '채팅', photos: '사진', map: '지도', bucket: '버킷리스트', heart: '하트' }[t];
   stopPoll();
   if (t === 'cal') { loadMonth(); tickDday(); renderDdayNext(); }
   if (t === 'notes') { loadNotes(true); poll = setInterval(() => loadNotes(false), 4000); }
   if (t === 'chat') { loadTalk(true).then(beat); poll = setInterval(() => { loadTalk(false); beat(); }, 3000); }
   if (t === 'photos') loadAlbum();
   if (t === 'map') { initMap(); setTimeout(() => map && map.invalidateSize(), 50); loadPlaces(); }
+  if (t === 'heart') { openHeart(); poll = setInterval(loadHearts, 3000); }
   if (t === 'bucket') { loadBucket(); poll = setInterval(loadBucket, 8000); }
 }
 let poll = null;
@@ -570,6 +571,79 @@ $('#pv-del').onclick = async () => {
     closeSheet(); await loadPlaces(); toast('삭제했어요');
   } catch (e) { handleErr(e); } finally { busy(false); }
 };
+
+/* ================= 하트 ================= */
+let mySide = store.get('side', '');
+let hearts = [];      // [{ name, side, count }]
+let pendingTaps = 0;
+let flushing = false;
+
+function openHeart() {
+  if (!mySide) openSheet('#sheet-side');
+  loadHearts();
+}
+async function loadHearts() {
+  try { hearts = (await db.select('hearts', 'select=*')) || []; renderHearts(); } catch (e) { handleErr(e); stopPoll(); }
+}
+function renderHearts() {
+  const bySide = { m: null, f: null };
+  for (const h of hearts) if (h.side && (!bySide[h.side] || h.name === me)) bySide[h.side] = h;
+  let total = 0;
+  for (const h of hearts) total += Number(h.count) || 0;
+  total += pendingTaps;
+  for (const side of ['m', 'f']) {
+    const h = bySide[side];
+    let n = h ? Number(h.count) || 0 : 0;
+    if (side === mySide) n += pendingTaps;
+    $(`#ht-${side}`).textContent = n.toLocaleString();
+    $(`#ht-${side}-name`).textContent = side === mySide ? me : (h ? h.name : (side === 'm' ? '남자' : '여자'));
+  }
+  $('#ht-total').textContent = total.toLocaleString();
+  $$('.side').forEach((el) => el.classList.toggle('mine', el.dataset.side === mySide));
+}
+function buzz() {
+  const H = window.Capacitor?.Plugins?.Haptics;
+  if (H) H.impact({ style: 'HEAVY' }).catch(() => navigator.vibrate && navigator.vibrate(40));
+  else if (navigator.vibrate) navigator.vibrate(40);
+}
+function floatHeart(x, y) {
+  const el = document.createElement('div');
+  el.className = 'floater'; el.textContent = ['💗', '💖', '💕', '❤️'][Math.floor(Math.random() * 4)];
+  el.style.left = `${x + (Math.random() * 40 - 20)}px`; el.style.top = `${y}px`;
+  $('#floaters').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+async function flushTaps() {
+  if (flushing || !pendingTaps || !mySide) return;
+  flushing = true;
+  const n = pendingTaps;
+  try {
+    await sb('/rest/v1/rpc/add_hearts', { method: 'POST', json: { p_name: me, p_side: mySide, p_n: n } });
+    pendingTaps -= n;
+    await loadHearts();
+  } catch (e) { handleErr(e); } finally { flushing = false; }
+}
+setInterval(flushTaps, 1200);
+$$('.figure').forEach((fig) => {
+  fig.addEventListener('click', (e) => {
+    if (!mySide) { openSheet('#sheet-side'); return; }
+    const heart = fig.querySelector('.heart');
+    const r = heart.getBoundingClientRect();
+    const box = $('#tab-heart').getBoundingClientRect();
+    buzz();
+    pendingTaps++;
+    heart.classList.remove('beat'); void heart.getBoundingClientRect(); heart.classList.add('beat');
+    floatHeart(r.left - box.left + r.width / 2 - 12, r.top - box.top + $('#tab-heart').scrollTop);
+    renderHearts();
+  });
+});
+$$('.side-pick').forEach((b) => (b.onclick = async () => {
+  await flushTaps();
+  mySide = b.dataset.side; store.set('side', mySide); closeSheet();
+  toast(mySide === 'm' ? '왼쪽(남자)으로 정했어요' : '오른쪽(여자)으로 정했어요');
+  try { await sb('/rest/v1/rpc/add_hearts', { method: 'POST', json: { p_name: me, p_side: mySide, p_n: 0 } }); } catch {}
+  if (curTab === 'heart') loadHearts();
+}));
 
 /* ================= 노트(대화) ================= */
 let notes = [];

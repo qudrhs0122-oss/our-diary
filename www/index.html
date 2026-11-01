@@ -124,6 +124,58 @@
     <div id="place-list" class="place-list hidden"></div>
   </div>
 
+  <!-- 하트 -->
+  <div id="tab-heart" class="tab hidden">
+    <div class="heart-total">우리 하트 <b id="ht-total">0</b>번</div>
+    <div class="couple">
+      <div class="side" data-side="m">
+        <div class="count"><b id="ht-m">0</b><span id="ht-m-name">남자</span></div>
+        <button class="figure" data-side="m" aria-label="남자 하트">
+          <svg viewBox="0 0 160 300" class="person">
+          <rect x="22" y="128" width="20" height="92" rx="10" fill="#f2c8a8"/>
+          <rect x="118" y="128" width="20" height="92" rx="10" fill="#f2c8a8"/>
+          <rect x="22" y="112" width="22" height="64" rx="11" fill="#5b8fd6"/>
+          <rect x="116" y="112" width="22" height="64" rx="11" fill="#5b8fd6"/>
+          <rect x="56" y="214" width="20" height="74" rx="9" fill="#3d4a66"/>
+          <rect x="84" y="214" width="20" height="74" rx="9" fill="#3d4a66"/>
+          <rect x="38" y="100" width="84" height="122" rx="26" fill="#6fa8e8"/>
+          <rect x="70" y="86" width="20" height="20" fill="#f2c8a8"/>
+          <circle cx="80" cy="56" r="38" fill="#f6d2b4"/>
+          <path d="M42,52 C42,22 62,14 80,14 C102,14 120,24 118,52 C112,40 102,34 92,36 C80,30 60,36 42,52 Z" fill="#3a2b26"/>
+          <circle cx="66" cy="60" r="4" fill="#3a2b26"/><circle cx="94" cy="60" r="4" fill="#3a2b26"/>
+          <path d="M70,76 Q80,84 90,76" stroke="#c9735f" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <circle cx="58" cy="72" r="6" fill="#ffb3a8" opacity=".6"/><circle cx="102" cy="72" r="6" fill="#ffb3a8" opacity=".6"/>
+          <g class="heart" transform="translate(80,150)"><path d="M0,-6 C-4,-14 -16,-12 -16,-2 C-16,6 -6,12 0,18 C6,12 16,6 16,-2 C16,-12 4,-14 0,-6 Z" transform="scale(1.6)"/></g>
+        </svg>
+        </button>
+      </div>
+      <div class="side" data-side="f">
+        <div class="count"><b id="ht-f">0</b><span id="ht-f-name">여자</span></div>
+        <button class="figure" data-side="f" aria-label="여자 하트">
+          <svg viewBox="0 0 160 300" class="person">
+          <path d="M38,40 C30,90 34,130 46,150 L114,150 C126,130 130,90 122,40 Z" fill="#5a3a30"/>
+          <rect x="24" y="126" width="20" height="90" rx="10" fill="#f6d2b4"/>
+          <rect x="116" y="126" width="20" height="90" rx="10" fill="#f6d2b4"/>
+          <rect x="24" y="112" width="22" height="46" rx="11" fill="#ff8fa3"/>
+          <rect x="114" y="112" width="22" height="46" rx="11" fill="#ff8fa3"/>
+          <rect x="60" y="226" width="16" height="62" rx="8" fill="#f6d2b4"/>
+          <rect x="84" y="226" width="16" height="62" rx="8" fill="#f6d2b4"/>
+          <path d="M50,104 C50,100 110,100 110,104 L132,236 C132,240 28,240 28,236 Z" fill="#ff9eb1"/>
+          <rect x="71" y="88" width="18" height="18" fill="#f6d2b4"/>
+          <circle cx="80" cy="58" r="36" fill="#f9dcc4"/>
+          <path d="M42,62 C38,24 60,16 80,16 C104,16 124,28 118,64 C112,46 100,36 80,38 C64,38 50,46 42,62 Z" fill="#5a3a30"/>
+          <circle cx="67" cy="62" r="4" fill="#3a2b26"/><circle cx="93" cy="62" r="4" fill="#3a2b26"/>
+          <path d="M71,77 Q80,85 89,77" stroke="#d0606a" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <circle cx="59" cy="73" r="6" fill="#ff9aa8" opacity=".6"/><circle cx="101" cy="73" r="6" fill="#ff9aa8" opacity=".6"/>
+          <g class="heart" transform="translate(80,150)"><path d="M0,-6 C-4,-14 -16,-12 -16,-2 C-16,6 -6,12 0,18 C6,12 16,6 16,-2 C16,-12 4,-14 0,-6 Z" transform="scale(1.6)"/></g>
+        </svg>
+        </button>
+      </div>
+    </div>
+    <p class="heart-hint">가슴의 하트를 눌러주세요 💗</p>
+    <div id="floaters"></div>
+  </div>
+
   <!-- 버킷리스트 -->
   <div id="tab-bucket" class="tab hidden">
     <div class="bucket-add">
@@ -153,6 +205,7 @@
     <button data-tab="photos"><span>🖼️</span>사진</button>
     <button data-tab="map"><span>🗺️</span>지도</button>
     <button data-tab="bucket"><span>✅</span>버킷</button>
+    <button data-tab="heart"><span>💗</span>하트</button>
   </nav>
 </section>
 
@@ -225,11 +278,25 @@
   </div>
 </div>
 
+<div id="sheet-side" class="sheet hidden">
+  <h3>나는 어느 쪽인가요?</h3>
+  <p class="muted small">한 번만 정하면 돼요. 나중에 설정(⚙️)에서 바꿀 수 있어요.</p>
+  <div class="row">
+    <button class="btn side-pick" data-side="m">👦 왼쪽 (남자)</button>
+    <button class="btn side-pick" data-side="f">👧 오른쪽 (여자)</button>
+  </div>
+</div>
+
 <div id="sheet-settings" class="sheet hidden">
   <h3>설정</h3>
   <label class="muted small">내 이름</label>
   <input id="set-name" type="text" maxlength="10">
   <button id="set-save" class="btn primary">이름 저장</button>
+  <label class="muted small">하트 페이지에서 나는</label>
+  <div class="row">
+    <button class="btn side-pick" data-side="m">👦 왼쪽 (남자)</button>
+    <button class="btn side-pick" data-side="f">👧 오른쪽 (여자)</button>
+  </div>
   <button id="set-logout" class="btn">로그아웃</button>
   <button class="btn" data-close>닫기</button>
 </div>
