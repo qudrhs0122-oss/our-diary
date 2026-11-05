@@ -44,6 +44,9 @@ jobs:
           # 지도 '내 위치'용 위치 권한
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
           grep -n "LOCATION" android/app/src/main/AndroidManifest.xml
+          # 키보드가 올라오면 화면이 키보드 위로 줄어들게
+          grep -q windowSoftInputMode android/app/src/main/AndroidManifest.xml || sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:windowSoftInputMode="adjustResize"#' android/app/src/main/AndroidManifest.xml
+          grep -n "windowSoftInputMode" android/app/src/main/AndroidManifest.xml || true
           rm -rf $RES/mipmap-anydpi-v26
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp icons/$d.png $RES/mipmap-$d/ic_launcher.png

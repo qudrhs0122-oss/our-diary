@@ -963,3 +963,44 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 start();
+
+/* ================= 키보드 올라오면 화면도 같이 올리기 ================= */
+(() => {
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  let nativeKb = 0;   // 안드로이드 앱: 키보드 플러그인이 알려주는 높이
+  let fullH = window.innerHeight;
+  const typing = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName); };
+  function fit() {
+    let h = vv ? vv.height : window.innerHeight;
+    const top = vv ? Math.max(0, vv.offsetTop) : 0;
+    if (!typing() && !nativeKb) fullH = Math.max(window.innerHeight, h);
+    // 앱이 키보드 높이는 받았는데 화면이 안 줄었으면 직접 줄임
+    if (nativeKb && fullH - h < nativeKb * 0.5) h = fullH - nativeKb;
+    const open = nativeKb > 0 || (typing() && fullH - h > 120);
+    root.style.setProperty('--app-h', Math.round(h) + 'px');
+    root.style.setProperty('--app-top', Math.round(top) + 'px');
+    const was = document.body.classList.contains('kb');
+    document.body.classList.toggle('kb', open);
+    if (open) {
+      // 열려 있는 대화창은 맨 아래(최근 메시지)가 보이게
+      requestAnimationFrame(() => ['#chat', '#talk'].forEach((id) => {
+        const box = $(id); if (box && box.offsetParent) box.scrollTop = box.scrollHeight;
+      }));
+      if (!was && window.scrollY) window.scrollTo(0, 0);
+    }
+  }
+  if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', () => { fullH = 0; setTimeout(fit, 300); });
+  document.addEventListener('focusin', () => setTimeout(fit, 50));
+  document.addEventListener('focusout', () => setTimeout(fit, 120));
+  const K = window.Capacitor?.Plugins?.Keyboard;
+  if (K?.addListener) {
+    K.addListener('keyboardWillShow', (i) => { nativeKb = i?.keyboardHeight || 0; fit(); });
+    K.addListener('keyboardDidShow', (i) => { nativeKb = i?.keyboardHeight || nativeKb; fit(); });
+    K.addListener('keyboardWillHide', () => { nativeKb = 0; fit(); });
+    K.addListener('keyboardDidHide', () => { nativeKb = 0; fit(); });
+  }
+  fit();
+})();
