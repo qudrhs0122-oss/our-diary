@@ -968,6 +968,27 @@ document.addEventListener('visibilitychange', () => {
   }, 5000);
 })();
 
+// PC 버전: 채팅 입력칸에서 Enter = 보내기, Ctrl+Enter (또는 Shift+Enter) = 줄바꿈
+(function pcEnterToSend() {
+  if (!/Electron/i.test(navigator.userAgent)) return;
+  [['#chat-text', '#chat-send'], ['#talk-text', '#talk-send']].forEach(([ta, btn]) => {
+    const el = $(ta);
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return; // 한글 입력 중엔 글자부터 완성
+      if (e.shiftKey) return; // Shift+Enter 는 원래대로 줄바꿈
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const a = el.selectionStart, z = el.selectionEnd;
+        el.value = el.value.slice(0, a) + '\n' + el.value.slice(z);
+        el.selectionStart = el.selectionEnd = a + 1;
+        el.dispatchEvent(new Event('input'));
+        return;
+      }
+      $(btn).click();
+    });
+  });
+})();
+
 // 안드로이드 뒤로가기 버튼
 (function setupBack() {
   const App = window.Capacitor?.Plugins?.App;
