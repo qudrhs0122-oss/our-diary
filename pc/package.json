@@ -12,9 +12,33 @@
   "build": {
     "appId": "com.ourdiary.pc",
     "productName": "Flashlight",
-    "files": ["main.js", "www/**/*"],
-    "directories": { "output": "dist" },
-    "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "icon": "www/icons/icon-512.png" },
-    "portable": { "artifactName": "our-diary.exe" }
+    "files": [
+      "main.js",
+      "www/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "www/icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "our-diary.exe",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "손전등",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

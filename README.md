@@ -13,4 +13,4 @@
 
 ## PC(윈도우)에서 쓰기
 - `main`에 올리면 GitHub Actions(`build-exe.yml`)가 `pc/`로 윈도우용 exe를 만들어 `exe` 브랜치에 `our-diary.exe`로 올림
-- 다운로드: https://github.com/qudrhs0122-oss/our-diary/raw/exe/our-diary.exe (설치 없이 더블클릭)
+- 다운로드: https://github.com/qudrhs0122-oss/our-diary/raw/exe/our-diary.exe (더블클릭하면 바로 설치되고 바탕화면에 손전등 아이콘 생김)

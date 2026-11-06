@@ -29,8 +29,11 @@ jobs:
           cp -r www pc/www
           cd pc
           npm install --no-audit --no-fund
-          npx electron-builder --win portable --x64 --publish never
+          npx electron-builder --win nsis --x64 --publish never
           ls -la dist
+          # ffmpeg.dll 등 필요한 파일이 다 들어갔는지 확인
+          ls dist/win-unpacked
+          test -f dist/win-unpacked/ffmpeg.dll
 
       - uses: actions/upload-artifact@v4
         with:
