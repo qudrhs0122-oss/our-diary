@@ -953,6 +953,21 @@ document.addEventListener('visibilitychange', () => {
   if (session && me && !$('#main').classList.contains('hidden')) { switchTab(curTab); beat(); }
 });
 
+// PC 버전: 5분 동안 아무것도 안 하면 1204 잠금화면으로 (로그인은 그대로 유지)
+(function pcIdleLock() {
+  if (!/Electron/i.test(navigator.userAgent)) return;
+  const LIMIT = 5 * 60 * 1000;
+  let last = Date.now();
+  const touch = () => { last = Date.now(); };
+  ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((ev) => window.addEventListener(ev, touch, { passive: true, capture: true }));
+  setInterval(() => {
+    if (unlocked && Date.now() - last > LIMIT) {
+      unlocked = false; stopPoll(); beat(true); closeSheet(); closeViewer();
+      $('#gate-pw').value = ''; start();
+    }
+  }, 5000);
+})();
+
 // 안드로이드 뒤로가기 버튼
 (function setupBack() {
   const App = window.Capacitor?.Plugins?.App;
