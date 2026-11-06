@@ -2,3 +2,6 @@ node_modules/
 android/
 *.apk
 build.log
+pc/www/
+pc/node_modules/
+pc/dist/

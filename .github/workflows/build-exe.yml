@@ -1,0 +1,53 @@
+name: Build PC exe
+
+# main 에 올리면 윈도우용 손전등.exe 를 만들어 'exe' 브랜치에 our-diary.exe 로 올림
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-exe
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build exe
+        shell: bash
+        run: |
+          cp -r www pc/www
+          cd pc
+          npm install --no-audit --no-fund
+          npx electron-builder --win portable --x64 --publish never
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: our-diary-exe
+          path: pc/dist/our-diary.exe
+
+      - name: Publish exe to 'exe' branch
+        shell: bash
+        run: |
+          mkdir out
+          cp pc/dist/our-diary.exe out/our-diary.exe
+          echo "${GITHUB_SHA}" > out/commit.txt
+          cd out
+          git init -q
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout -q -b exe
+          git add .
+          git commit -q -m "exe for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" exe

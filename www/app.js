@@ -664,25 +664,28 @@ async function loadNotes(scroll) {
     const atBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80;
     notes = list; notesSig = sig;
     await signUrls(notes.map((n) => n.photo_path)).catch(() => {});
+    await ensureAvatars(notes.map((n) => n.author));
     renderNotes();
     if (scroll || atBottom) chat.scrollTop = chat.scrollHeight;
   } catch (e) { if (scroll) handleErr(e); }
 }
 
 function renderNotes() {
-  let html = ''; let lastDay = '';
+  let html = ''; let lastDay = ''; let lastAuthor = '';
   for (const n of notes) {
     const day = ymd(new Date(n.created_at));
-    if (day !== lastDay) { html += `<div class="date-sep">${prettyDate(day)}</div>`; lastDay = day; }
+    const newDay = day !== lastDay;
+    if (newDay) { html += `<div class="date-sep">${prettyDate(day)}</div>`; lastDay = day; }
     const who = mine(n.author) ? 'me' : 'you';
-    html += `<div class="msg ${who}" data-id="${n.id}">
-      ${who === 'you' ? `<div class="name">${esc(n.author)}</div>` : ''}
+    const first = n.author !== lastAuthor || newDay; lastAuthor = n.author;
+    html += `<div class="line ${who}">${avatarHtml(n.author, who, !first)}<div class="msg ${who}" data-id="${n.id}">
+      ${who === 'you' && first ? `<div class="name">${esc(n.author)}</div>` : ''}
       ${n.photo_path ? `<img src="${photoUrl(n.photo_path)}" data-path="${esc(n.photo_path)}" alt="">` : ''}
-      ${n.body ? `<div class="bubble">${esc(n.body)}</div>` : ''}
-      <div class="time">${hm(n.created_at)}</div></div>`;
+      ${n.body ? bubbleHtml(n.body) : ''}
+      <div class="time">${hm(n.created_at)}</div></div></div>`;
   }
   $('#chat').innerHTML = html || '<div class="empty">첫 기록을 남겨보세요 ✍️</div>';
-  $$('#chat img').forEach((img) => img.addEventListener('load', () => {
+  $$('#chat img:not(.av)').forEach((img) => img.addEventListener('load', () => {
     const chat = $('#chat'); if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 400) chat.scrollTop = chat.scrollHeight;
   }, { once: true }));
 }
@@ -743,17 +746,20 @@ async function loadTalk(scroll) {
     const box = $('#talk');
     const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     talk = list; talkSig = sig;
+    await ensureAvatars(talk.map((n) => n.author));
     renderTalk();
     if (scroll || atBottom) box.scrollTop = box.scrollHeight;
   } catch (e) { if (scroll) handleErr(e); }
 }
 function renderTalk() {
+  let lastAuthor = '';
   $('#talk').innerHTML = talk.map((n) => {
     const who = mine(n.author) ? 'me' : 'you';
-    return `<div class="msg ${who}" data-id="${n.id}">
-      ${who === 'you' ? `<div class="name">${esc(n.author)}</div>` : ''}
-      <div class="bubble">${esc(n.body)}</div>
-      <div class="time">${who === 'me' ? readMark(n.created_at) : ''}${hm(n.created_at)}</div></div>`;
+    const first = n.author !== lastAuthor; lastAuthor = n.author;
+    return `<div class="line ${who}">${avatarHtml(n.author, who, !first)}<div class="msg ${who}" data-id="${n.id}">
+      ${who === 'you' && first ? `<div class="name">${esc(n.author)}</div>` : ''}
+      ${bubbleHtml(n.body)}
+      <div class="time">${who === 'me' ? readMark(n.created_at) : ''}${hm(n.created_at)}</div></div></div>`;
   }).join('') || '<div class="empty">오늘의 대화를 시작해 보세요 💬</div>';
 }
 
@@ -913,7 +919,7 @@ $('#me-save').onclick = () => {
   const n = $('#me-name').value.trim(); if (!n) { toast('이름을 적어주세요'); return; }
   me = n; store.set('me', me); start();
 };
-$('#settings-btn').onclick = () => { $('#set-name').value = me; openSheet('#sheet-settings'); };
+$('#settings-btn').onclick = () => { $('#set-name').value = me; renderMyAvatar(); openSheet('#sheet-settings'); ensureAvatars([me]).then(renderMyAvatar); };
 $('#set-save').onclick = () => {
   const n = $('#set-name').value.trim(); if (!n) return;
   const old = me;
@@ -1004,3 +1010,117 @@ start();
   }
   fit();
 })();
+
+/* ================= 프로필 사진 ================= */
+// 저장 위치: photos/profiles/<이름을 16진수로>/<시간>.jpg  (가장 최근 파일이 프로필)
+const avatars = new Map(); // 이름 -> 사진 주소 ('' 이면 없음)
+let avatarsAt = 0;
+const nameKey = (n) => Array.from(new TextEncoder().encode(n)).map((b) => b.toString(16).padStart(2, '0')).join('');
+async function listAvatarFiles(name) {
+  const list = await sb('/storage/v1/object/list/photos', { method: 'POST',
+    json: { prefix: `profiles/${nameKey(name)}`, limit: 20, offset: 0, sortBy: { column: 'name', order: 'desc' } } });
+  return (list || []).filter((x) => x && x.id && /\.jpg$/.test(x.name)).map((x) => `profiles/${nameKey(name)}/${x.name}`).sort().reverse();
+}
+async function fetchAvatar(name) {
+  try {
+    const files = await listAvatarFiles(name);
+    if (!files.length) { avatars.set(name, ''); return; }
+    await signUrls([files[0]]); avatars.set(name, photoUrl(files[0]));
+  } catch { if (!avatars.has(name)) avatars.set(name, ''); }
+}
+async function ensureAvatars(names) {
+  if (Date.now() - avatarsAt > 10 * 60 * 1000) { avatars.clear(); avatarsAt = Date.now(); }
+  const need = [...new Set(names.filter(Boolean))].filter((n) => !avatars.has(n));
+  if (need.length) await Promise.all(need.map(fetchAvatar));
+}
+function avatarHtml(name, who, spacer) {
+  if (spacer) return '<div class="av sp"></div>';
+  const u = avatars.get(name);
+  if (u) return `<img class="av" src="${esc(u)}" alt="">`;
+  return `<div class="av ph ${who}">${esc(Array.from(String(name || '?'))[0] || '?')}</div>`;
+}
+function renderMyAvatar() {
+  const box = $('#set-av'); const u = avatars.get(me);
+  box.className = 'av big' + (u ? '' : ' ph me');
+  box.innerHTML = u ? `<img class="av big" src="${esc(u)}" alt="">` : esc(Array.from(me || '?')[0] || '?');
+}
+function rerenderChats() { if (curTab === 'notes') renderNotes(); if (curTab === 'chat') renderTalk(); }
+$('#set-av-file').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f || !me) return;
+  busy(true);
+  try {
+    const old = await listAvatarFiles(me).catch(() => []);
+    const blob = await shrink(f, 400);
+    const path = `profiles/${nameKey(me)}/${Date.now()}.jpg`;
+    await storage.upload(path, blob);
+    if (old.length) storage.remove(old).catch(() => {});
+    avatars.set(me, URL.createObjectURL(blob));
+    renderMyAvatar(); rerenderChats(); toast('프로필 사진을 바꿨어요');
+  } catch (err) { handleErr(err); } finally { busy(false); }
+};
+$('#set-av-del').onclick = async () => {
+  if (!me) return;
+  try {
+    const old = await listAvatarFiles(me);
+    if (old.length) await storage.remove(old);
+    avatars.set(me, ''); renderMyAvatar(); rerenderChats(); toast('기본 사진으로 바꿨어요');
+  } catch (err) { handleErr(err); }
+};
+
+/* ================= 이모티콘 ================= */
+const EMOJI = {
+  '표정': '😀 😁 😂 🤣 😊 😍 🥰 😘 😚 😋 😜 🤪 😎 🤗 🤭 🫢 🤔 😏 😴 🥱 😌 😳 🥺 😢 😭 😤 😡 🤯 😱 🙄 😇 🫠',
+  '하트': '❤️ 🧡 💛 💚 💙 💜 🤍 🖤 💕 💞 💓 💗 💖 💘 💝 💌 😻 🫶 💋 💑 💏 👩‍❤️‍👨',
+  '손': '👍 👎 👏 🙌 🙏 🤝 ✌️ 🤞 🤟 👌 👋 💪 🫡 🤙 👉 👈',
+  '동물': '🐶 🐱 🐰 🐻 🐼 🐨 🐯 🦁 🐷 🐥 🐣 🦊 🐹 🐧 🐳 🦄',
+  '음식': '🍚 🍜 🍕 🍔 🍗 🍣 🍰 🎂 🍩 🍫 🍓 🍑 🍺 🍷 ☕ 🧋',
+  '기타': '✨ 🎉 🎁 🌸 🌹 🌙 ⭐ ☀️ 🌈 🔥 💯 💤 💩 👻 🎵 📷',
+};
+const RECENT_KEY = 'recentEmoji';
+function emojiPanelHtml() {
+  const recent = store.get(RECENT_KEY, []);
+  let h = '';
+  if (recent.length) h += '<div class="emo-title">최근</div>' + recent.map((e) => `<button type="button">${e}</button>`).join('');
+  for (const [title, list] of Object.entries(EMOJI)) {
+    h += `<div class="emo-title">${title}</div>` + list.split(' ').map((e) => `<button type="button">${e}</button>`).join('');
+  }
+  return h;
+}
+const caret = {};
+$$('.emo-btn').forEach((btn) => {
+  const id = btn.dataset.for; const ta = $('#' + id);
+  const panel = $(`.emo-panel[data-for="${id}"]`);
+  const remember = () => { caret[id] = [ta.selectionStart ?? ta.value.length, ta.selectionEnd ?? ta.value.length]; };
+  ['keyup', 'click', 'input', 'blur'].forEach((ev) => ta.addEventListener(ev, remember));
+  ta.addEventListener('focus', () => panel.classList.add('hidden'));
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.onclick = () => {
+    const open = panel.classList.contains('hidden');
+    if (open) { panel.innerHTML = emojiPanelHtml(); ta.blur(); }
+    panel.classList.toggle('hidden', !open);
+    const box = id === 'talk-text' ? $('#talk') : $('#chat');
+    requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+  };
+  panel.addEventListener('mousedown', (e) => e.preventDefault());
+  panel.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const em = b.textContent;
+    const [a, z] = caret[id] || [ta.value.length, ta.value.length];
+    ta.value = ta.value.slice(0, a) + em + ta.value.slice(z);
+    caret[id] = [a + em.length, a + em.length];
+    ta.dispatchEvent(new Event('input'));
+    const r = [em, ...store.get(RECENT_KEY, []).filter((x) => x !== em)].slice(0, 16);
+    store.set(RECENT_KEY, r);
+  });
+});
+// 보내면 이모티콘 창 닫기
+['#chat-send', '#talk-send'].forEach((s) => $(s).addEventListener('click', () => $$('.emo-panel').forEach((p) => p.classList.add('hidden'))));
+
+// 이모티콘만 보내면 크게 보여주기
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|‍|️|\s)+$/u;
+function bubbleHtml(body) {
+  const t = String(body || '').trim();
+  const n = Array.from(t.matchAll(/\p{Extended_Pictographic}/gu)).length;
+  const big = t && EMOJI_ONLY.test(t) && n > 0 && n <= 3;
+  return `<div class="bubble${big ? ' big-emoji' : ''}">${esc(body)}</div>`;
+}

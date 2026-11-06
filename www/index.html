@@ -97,9 +97,11 @@
       <img id="chat-preview-img" alt="">
       <button id="chat-preview-x" class="icon-btn">✕</button>
     </div>
+    <div class="emo-panel hidden" data-for="chat-text"></div>
     <div class="chat-input">
       <label class="icon-btn attach">📷<input id="chat-camera" type="file" accept="image/*" capture="environment" hidden></label>
       <label class="icon-btn attach">🖼️<input id="chat-file" type="file" accept="image/*" hidden></label>
+      <button class="icon-btn emo-btn" data-for="chat-text" aria-label="이모티콘">😊</button>
       <textarea id="chat-text" rows="1" placeholder="메시지 남기기"></textarea>
       <button id="chat-send" class="btn primary small">보내기</button>
     </div>
@@ -109,7 +111,9 @@
   <div id="tab-chat" class="tab hidden">
     <div class="chat-banner">🌙 오늘 대화는 자정(00:00)에 모두 사라져요</div>
     <div id="talk" class="chat"></div>
+    <div class="emo-panel hidden" data-for="talk-text"></div>
     <div class="chat-input">
+      <button class="icon-btn emo-btn" data-for="talk-text" aria-label="이모티콘">😊</button>
       <textarea id="talk-text" rows="1" placeholder="메시지 보내기"></textarea>
       <button id="talk-send" class="btn primary small">보내기</button>
     </div>
@@ -291,6 +295,12 @@
 
 <div id="sheet-settings" class="sheet hidden">
   <h3>설정</h3>
+  <label class="muted small">내 프로필 사진</label>
+  <div class="av-set">
+    <div id="set-av" class="av big"></div>
+    <label class="btn small">사진 고르기<input id="set-av-file" type="file" accept="image/*" hidden></label>
+    <button id="set-av-del" class="btn small">기본으로</button>
+  </div>
   <label class="muted small">내 이름</label>
   <input id="set-name" type="text" maxlength="10">
   <button id="set-save" class="btn primary">이름 저장</button>
