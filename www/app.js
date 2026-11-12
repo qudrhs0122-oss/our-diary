@@ -734,33 +734,76 @@ $('#chat').addEventListener('click', (e) => {
 let talk = [];
 let talkSig = '';
 let talkDay = '';
+let talkFile = null;   // 보낼 사진
+let replyTo = null;    // 댓글 달 원글
 function midnightISO() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+
+// 사진·댓글 정보는 본문 안에 함께 저장 (DB 설정 변경 없이 동작)
+const TALK_MARK = '⁣';
+function packTalk(o) { return o.p || o.r ? TALK_MARK + JSON.stringify(o) : o.t; }
+function unpackTalk(n) {
+  const b = n.body || '';
+  if (b.startsWith(TALK_MARK)) { try { const o = JSON.parse(b.slice(1)); return { ...n, text: o.t || '', photo: o.p || null, parent: o.r || null }; } catch { /* 그냥 글자로 */ } }
+  return { ...n, text: b, photo: null, parent: null };
+}
 
 async function loadTalk(scroll) {
   try {
     // 오늘 0시 이후 메시지만 (서버에서도 매일 자정에 삭제됨)
     const rows = await db.select('chats', `select=*&created_at=gte.${encodeURIComponent(midnightISO())}&order=created_at.asc&limit=500`);
-    const list = rows || [];
+    const list = (rows || []).map(unpackTalk);
     const sig = ymd(new Date()) + list.map((n) => n.id).join(',');
     if (sig === talkSig && !scroll) return;
     const box = $('#talk');
     const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     talk = list; talkSig = sig;
+    await signUrls(talk.map((n) => n.photo)).catch(() => {});
     await ensureAvatars(talk.map((n) => n.author));
     renderTalk();
     if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+    cleanOldTalkPhotos();
   } catch (e) { if (scroll) handleErr(e); }
 }
+function talkMsgHtml(n, who, showName, cls = '') {
+  return `<div class="msg ${who} ${cls}" data-id="${n.id}">
+      ${showName ? `<div class="name">${esc(n.author)}</div>` : ''}
+      ${n.photo ? `<img src="${photoUrl(n.photo)}" data-path="${esc(n.photo)}" alt="">` : ''}
+      ${n.text ? bubbleHtml(n.text) : ''}
+      <div class="time">${who === 'me' ? readMark(n.created_at) : ''}${hm(n.created_at)}</div></div>`;
+}
 function renderTalk() {
+  const ids = new Set(talk.map((n) => n.id));
+  const kids = new Map();
+  for (const n of talk) if (n.parent && ids.has(n.parent)) { if (!kids.has(n.parent)) kids.set(n.parent, []); kids.get(n.parent).push(n); }
   let lastAuthor = '';
-  $('#talk').innerHTML = talk.map((n) => {
+  $('#talk').innerHTML = talk.filter((n) => !(n.parent && ids.has(n.parent))).map((n) => {
     const who = mine(n.author) ? 'me' : 'you';
     const first = n.author !== lastAuthor; lastAuthor = n.author;
-    return `<div class="line ${who}">${avatarHtml(n.author, who, !first)}<div class="msg ${who}" data-id="${n.id}">
-      ${who === 'you' && first ? `<div class="name">${esc(n.author)}</div>` : ''}
-      ${bubbleHtml(n.body)}
-      <div class="time">${who === 'me' ? readMark(n.created_at) : ''}${hm(n.created_at)}</div></div></div>`;
-  }).join('') || '<div class="empty">오늘의 대화를 시작해 보세요 💬</div>';
+    const cs = kids.get(n.id) || [];
+    if (cs.length) lastAuthor = '';
+    const replies = cs.length ? `<div class="replies ${who}">${cs.map((c) => {
+      const cw = mine(c.author) ? 'me' : 'you';
+      return `<div class="reply-line ${cw}">${avatarHtml(c.author, cw, false)}${talkMsgHtml(c, cw, true, 'reply')}</div>`;
+    }).join('')}</div>` : '';
+    return `<div class="line ${who}">${avatarHtml(n.author, who, !first)}${talkMsgHtml(n, who, who === 'you' && first)}</div>${replies}`;
+  }).join('') || '<div class="empty">오늘의 대화를 시작해 보세요 💬<br><small>메시지를 누르면 댓글을 달 수 있어요</small></div>';
+  $$('#talk img:not(.av)').forEach((img) => img.addEventListener('load', () => {
+    const box = $('#talk'); if (box.scrollHeight - box.scrollTop - box.clientHeight < 400) box.scrollTop = box.scrollHeight;
+  }, { once: true }));
+}
+// 어제 이전 채팅 사진은 조용히 정리
+let cleanedDay = '';
+async function cleanOldTalkPhotos() {
+  const t = ymd(new Date()); if (cleanedDay === t) return; cleanedDay = t;
+  try {
+    const days = await sb('/storage/v1/object/list/photos', { method: 'POST', json: { prefix: 'chat/', limit: 100 } });
+    const old = (days || []).map((d) => d.name).filter((d) => d && d !== t);
+    for (const d of old) {
+      const files = await sb('/storage/v1/object/list/photos', { method: 'POST', json: { prefix: `chat/${d}/`, limit: 1000 } });
+      const paths = (files || []).filter((f) => f.id).map((f) => `chat/${d}/${f.name}`);
+      if (paths.length) await storage.remove(paths);
+    }
+  } catch (e) { /* 실패해도 괜찮음 */ }
 }
 
 /* ================= 접속 상태 · 읽음 표시 ================= */
@@ -805,14 +848,75 @@ function renderPresence() {
 setInterval(() => { if (inApp() && curTab !== 'chat') beat(); }, 10000);
 const talkText = $('#talk-text');
 talkText.addEventListener('input', () => { talkText.style.height = 'auto'; talkText.style.height = Math.min(talkText.scrollHeight, 120) + 'px'; });
+
+// 사진 고르기 · 찍기 · 끌어다 놓기 · 붙여넣기
+function setTalkFile(f) {
+  if (!f || !/^image\//.test(f.type)) { if (f) toast('사진 파일만 올릴 수 있어요'); return; }
+  talkFile = f;
+  $('#talk-preview-img').src = URL.createObjectURL(f);
+  $('#talk-preview').classList.remove('hidden');
+}
+$('#talk-file').onchange = $('#talk-camera').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; setTalkFile(f); };
+$('#talk-preview-x').onclick = () => { talkFile = null; $('#talk-preview').classList.add('hidden'); };
+talkText.addEventListener('paste', (e) => {
+  const it = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+  if (it) { e.preventDefault(); setTalkFile(it.getAsFile()); }
+});
+function dropZone(tab, onFile) {
+  const el = $(tab); let depth = 0;
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  el.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; el.classList.add('dropping'); });
+  el.addEventListener('dragover', (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  el.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; el.classList.remove('dropping'); } });
+  el.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('dropping');
+    onFile([...e.dataTransfer.files].find((f) => f.type.startsWith('image/')) || e.dataTransfer.files[0]);
+  });
+}
+dropZone('#tab-chat', setTalkFile);
+// 창 밖으로 떨어뜨려도 사진이 새 창으로 열리지 않게
+['dragover', 'drop'].forEach((ev) => window.addEventListener(ev, (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); }));
+
+// 메시지 누르면 댓글 달기
+function setReply(n) {
+  replyTo = n;
+  if (!n) { $('#talk-reply').classList.add('hidden'); return; }
+  $('#talk-reply-text').textContent = `${n.author}님 글에 댓글 · ${n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '📷 사진'}`;
+  $('#talk-reply').classList.remove('hidden');
+  talkText.focus();
+}
+$('#talk-reply-x').onclick = () => setReply(null);
+$('#talk').addEventListener('click', (e) => {
+  const img = e.target.closest('img[data-path]');
+  if (img) {
+    const n = talk.find((x) => x.photo === img.dataset.path); if (!n) return;
+    openViewer({ path: n.photo, caption: n.text, author: n.author, when: `${prettyDate(ymd(new Date(n.created_at)))} ${hm(n.created_at)}`, canDelete: false });
+    return;
+  }
+  const m = e.target.closest('.msg'); if (!m) return;
+  const n = talk.find((x) => x.id === m.dataset.id); if (!n) return;
+  setReply(talk.find((x) => x.id === n.parent) || n); // 댓글을 누르면 같은 원글에 댓글
+});
+
 $('#talk-send').onclick = async () => {
-  const body = talkText.value.trim(); if (!body) return;
+  const text = talkText.value.trim();
+  if (!text && !talkFile) return;
   const btn = $('#talk-send'); btn.disabled = true;
+  if (talkFile) busy(true);
   try {
-    await db.insert('chats', { body, author: me });
+    let p = null;
+    if (talkFile) {
+      const blob = await shrink(talkFile);
+      p = `chat/${ymd(new Date())}/${uuid()}.jpg`;
+      await storage.upload(p, blob);
+      urlCache.set(p, URL.createObjectURL(blob));
+    }
+    await db.insert('chats', { body: packTalk({ t: text, p, r: replyTo?.id || null }), author: me });
     talkText.value = ''; talkText.style.height = 'auto';
-    await loadTalk(true);
-  } catch (e) { handleErr(e); } finally { btn.disabled = false; }
+    talkFile = null; $('#talk-preview').classList.add('hidden');
+    const wasReply = !!replyTo; setReply(null);
+    await loadTalk(!wasReply);
+  } catch (e) { handleErr(e); } finally { btn.disabled = false; busy(false); }
 };
 
 /* ================= 사진 앨범 ================= */

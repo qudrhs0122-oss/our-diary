@@ -290,3 +290,19 @@ img.av { display: block; }
 .emo-panel button:active { background: #f6ece9; }
 .emo-panel .emo-title { grid-column: 1 / -1; font-size: 12px; color: var(--muted); padding: 4px 2px 0; }
 .bubble.big-emoji { background: none !important; border: none !important; font-size: 46px; padding: 0 2px; line-height: 1.15; }
+
+/* 채팅 댓글 · 사진 끌어다 놓기 */
+.replies { display: flex; flex-direction: column; gap: 4px; margin: -2px 0 4px; padding-left: 14px; border-left: 2px solid var(--line); max-width: 80%; }
+.replies.me { align-self: flex-end; margin-right: 44px; }
+.replies.you { align-self: flex-start; margin-left: 44px; }
+.reply-line { display: flex; gap: 6px; align-items: flex-start; }
+.reply-line.me { flex-direction: row-reverse; align-self: flex-end; }
+.reply-line .av { transform: scale(.75); transform-origin: top center; }
+.msg.reply .bubble { font-size: 14px; padding: 7px 11px; }
+.msg.reply .name::before { content: '↪ '; }
+#talk .msg { cursor: pointer; }
+.reply-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f8f1ee; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.reply-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tab-chat { position: relative; }
+.drop-hint { display: none; position: absolute; inset: 8px; border: 3px dashed var(--me); border-radius: 18px; background: rgba(255,255,255,.85); align-items: center; justify-content: center; font-size: 18px; color: var(--me); z-index: 20; pointer-events: none; }
+#tab-chat.dropping .drop-hint { display: flex; }
